@@ -1,0 +1,66 @@
+.ribbon {
+  height: 72px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-top: var(--border);
+  box-shadow: var(--shadow-glow);
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+}
+
+.bar {
+  flex: 1;
+  min-width: 3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+}
+
+.fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(to top, rgba(34, 211, 238, 0.2), rgba(34, 211, 238, 0.75));
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.bar:hover .fill {
+  background: linear-gradient(to top, rgba(34, 211, 238, 0.35), var(--accent));
+}
+
+.errorPeak .fill {
+  background: linear-gradient(to top, rgba(248, 113, 113, 0.35), rgba(248, 113, 113, 0.9));
+}
+
+.active .fill {
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.title {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}

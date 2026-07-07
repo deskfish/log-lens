@@ -1,0 +1,52 @@
+.tree {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+
+.list,
+.list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.service,
+.node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.node {
+  padding-left: var(--space-4);
+  color: var(--muted);
+}
+
+.count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.empty {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}

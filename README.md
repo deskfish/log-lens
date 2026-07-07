@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Log Lens
 
-## Getting Started
+多服务、多节点日志合并分析 Web 工具。支持分片上传、关键字检索、时间线热力导航。
 
-First, run the development server:
+## 功能
+
+- 多文件上传（`.log` / `.txt` / `.gz`），标注服务名与节点名
+- 多服务/多节点日志按时间戳合并展示
+- FTS 关键字搜索 + 可选正则
+- 服务/节点筛选、时间范围过滤
+- Timeline Heat Ribbon 时间密度热力带
+- 虚拟滚动，支撑大结果集浏览
+
+## 快速开始
 
 ```bash
+cd /Users/sunlacey/codespace/personal/log-lens
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 环境变量
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# 可选：保护 API 接口
+API_KEY=your-secret-key
+```
 
-## Learn More
+设置 `API_KEY` 后，所有 `/api/*` 请求需带请求头 `x-api-key`。
 
-To learn more about Next.js, take a look at the following resources:
+## Docker 部署
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker compose up -d --build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+数据持久化在 `./data` 卷。
 
-## Deploy on Vercel
+## 设计稿
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+参考截图见 [`docs/design/screenshots/`](docs/design/screenshots/)。
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+完成 Figma 高保真稿后，用 Figma AI Bridge 导出并覆盖截图目录。
+
+## 技术栈
+
+- Next.js 16 + TypeScript
+- SQLite + FTS5
+- better-sqlite3 流式索引
+- @tanstack/react-virtual
+
+## 目录
+
+- `data/` — 上传文件与 SQLite 数据库（gitignore）
+- `docs/design/` — UI 设计说明与截图
+- `src/lib/parser/` — 日志格式解析
+- `src/lib/indexer/` — 流式索引管线

@@ -1,0 +1,119 @@
+.layout {
+  flex: 1;
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  min-height: 0;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1;
+  min-width: 220px;
+  height: 48px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.regex {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.levels {
+  min-width: 120px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.searchBtn,
+.back {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: var(--border);
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.progress {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: var(--text-sm);
+}
+
+.context {
+  width: 360px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: auto;
+}
+
+.context header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border);
+}
+
+.context h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.context ul {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+}
+
+.context li {
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border-bottom: 1px solid rgba(122, 132, 153, 0.08);
+}
+
+.ctxSelected {
+  color: var(--ink);
+  background: var(--accent-dim);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
