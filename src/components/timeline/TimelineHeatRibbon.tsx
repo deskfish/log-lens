@@ -1,5 +1,6 @@
 "use client";
 
+import { formatLogTime, formatLogTimeOfDay } from "@/lib/datetime";
 import type { TimeBucket } from "@/lib/types";
 import styles from "./TimelineHeatRibbon.module.css";
 
@@ -48,7 +49,7 @@ export function TimelineHeatRibbon({
               type="button"
               className={`${styles.bar} ${inRange ? styles.active : ""}`}
               style={{ height: `${height}%` }}
-              title={`${new Date(bucket.bucketStartMs).toLocaleString()} · ${bucket.count} 条`}
+              title={`${formatLogTime(bucket.bucketStartMs)} · ${bucket.count} 条`}
               onClick={() =>
                 onSelectRange(bucket.bucketStartMs, bucket.bucketStartMs + bucketSizeMs)
               }
@@ -61,9 +62,9 @@ export function TimelineHeatRibbon({
         })}
       </div>
       <div className={styles.labels}>
-        <span>{new Date(minTs).toLocaleTimeString()}</span>
-        <span className={styles.title}>Timeline Heat Ribbon</span>
-        <span>{new Date(maxTs).toLocaleTimeString()}</span>
+        <span>{formatLogTimeOfDay(minTs)}</span>
+        <span className={styles.title}>Timeline Heat Ribbon (UTC+8)</span>
+        <span>{formatLogTimeOfDay(maxTs)}</span>
       </div>
     </div>
   );

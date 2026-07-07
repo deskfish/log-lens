@@ -44,6 +44,15 @@ docker compose up -d --build
 
 完成 Figma 高保真稿后，用 Figma AI Bridge 导出并覆盖截图目录。
 
+## 从 100 环境拉取日志
+
+```bash
+# 需安装 sshpass: brew install sshpass
+LOG_FETCH_PASS='你的SSH密码' npm run fetch-100
+```
+
+日志保存到 `data/fetched-100-env/<日期>/`，默认拉取 `192.168.6.100` 上 `/data/flybot/server/*/logs/` 的今日日志。
+
 ## 验证
 
 ```bash

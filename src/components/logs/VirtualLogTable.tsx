@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import dayjs from "dayjs";
+import { formatLogTimeShort } from "@/lib/datetime";
 import { LogLevelBadge } from "./LogLevelBadge";
 import type { LogEntry } from "@/lib/types";
 import styles from "./VirtualLogTable.module.css";
@@ -92,9 +92,7 @@ export function VirtualLogTable({
                 onDoubleClick={() => onSelect?.(entry)}
               >
                 <span className={styles.time}>
-                  {entry.timestampMs
-                    ? dayjs(entry.timestampMs).format("HH:mm:ss.SSS")
-                    : "—"}
+                  {entry.timestampMs ? formatLogTimeShort(entry.timestampMs) : "—"}
                 </span>
                 <span>
                   <LogLevelBadge level={entry.level} />

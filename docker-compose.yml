@@ -5,6 +5,7 @@ services:
       - "3000:3000"
     environment:
       - API_KEY=${API_KEY:-}
+      - TZ=Asia/Shanghai
     volumes:
       - ./data:/app/data
     restart: unless-stopped

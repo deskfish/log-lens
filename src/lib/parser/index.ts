@@ -1,4 +1,5 @@
 import type { LogLevel } from "@/lib/types";
+import { parseLogTimestamp } from "@/lib/datetime";
 
 export interface ParsedLine {
   timestampMs: number | null;
@@ -21,7 +22,7 @@ const SPRING =
 const SPRING_BRACKET =
   /^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+\[[^\]]+\]\s+(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\s+/i;
 const ISO = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/;
-const NGINX = /\[(\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\]/;
+const NGINX = /\[(\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} ([+-]\d{4}))\]/;
 
 function normalizeLevel(raw: string): LogLevel {
   return LEVEL_MAP[raw.toUpperCase()] ?? "UNKNOWN";
@@ -30,25 +31,22 @@ function normalizeLevel(raw: string): LogLevel {
 function parseSpringBracket(line: string): ParsedLine | null {
   const match = line.match(SPRING_BRACKET);
   if (!match) return null;
-  const ts = Date.parse(match[1].replace(" ", "T"));
   const level = normalizeLevel(match[2]);
   const message = line.slice(match[0].length).trim();
-  return { timestampMs: Number.isNaN(ts) ? null : ts, level, message };
+  return { timestampMs: parseLogTimestamp(match[1]), level, message };
 }
 
 function parseSpring(line: string): ParsedLine | null {
   const match = line.match(SPRING);
   if (!match) return null;
-  const ts = Date.parse(match[1].replace(" ", "T"));
   const level = normalizeLevel(match[2]);
   const message = line.slice(match[0].length).trim();
-  return { timestampMs: Number.isNaN(ts) ? null : ts, level, message };
+  return { timestampMs: parseLogTimestamp(match[1]), level, message };
 }
 
 function parseIso(line: string): ParsedLine | null {
   const match = line.match(ISO);
   if (!match) return null;
-  const ts = Date.parse(match[1]);
   let level: LogLevel = "UNKNOWN";
   let message = line.slice(match[0].length).trim();
   const levelMatch = message.match(/^(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\b/i);
@@ -56,7 +54,7 @@ function parseIso(line: string): ParsedLine | null {
     level = normalizeLevel(levelMatch[1]);
     message = message.slice(levelMatch[0].length).trim();
   }
-  return { timestampMs: Number.isNaN(ts) ? null : ts, level, message };
+  return { timestampMs: parseLogTimestamp(match[1]), level, message };
 }
 
 function parseJson(line: string): ParsedLine | null {
@@ -66,14 +64,14 @@ function parseJson(line: string): ParsedLine | null {
     const tsRaw = obj.timestamp ?? obj.time ?? obj["@timestamp"];
     const levelRaw = String(obj.level ?? obj.severity ?? "UNKNOWN");
     const message = String(obj.message ?? obj.msg ?? line);
-    const ts =
-      typeof tsRaw === "number"
-        ? tsRaw
-        : typeof tsRaw === "string"
-          ? Date.parse(tsRaw)
-          : null;
+    let ts: number | null = null;
+    if (typeof tsRaw === "number") {
+      ts = tsRaw;
+    } else if (typeof tsRaw === "string") {
+      ts = parseLogTimestamp(tsRaw);
+    }
     return {
-      timestampMs: ts && !Number.isNaN(ts) ? ts : null,
+      timestampMs: ts,
       level: normalizeLevel(levelRaw),
       message,
     };
