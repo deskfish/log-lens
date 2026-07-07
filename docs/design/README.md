@@ -10,7 +10,9 @@
 
 | 文件 | 说明 |
 |------|------|
-| [03-analysis-main.png](./screenshots/03-analysis-main.png) | 主分析视图（AI 参考稿，待 Figma 高保真替换） |
+| [01-session-list.png](./screenshots/01-session-list.png) | 首页任务列表 |
+| [02-upload-wizard.png](./screenshots/02-upload-wizard.png) | 上传向导 |
+| [03-analysis-main.png](./screenshots/03-analysis-main.png) | 主分析视图 |
 
 ## Figma 同步
 

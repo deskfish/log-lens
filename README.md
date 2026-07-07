@@ -44,7 +44,12 @@ docker compose up -d --build
 
 完成 Figma 高保真稿后，用 Figma AI Bridge 导出并覆盖截图目录。
 
-## 技术栈
+## 验证
+
+```bash
+npm run build    # 构建检查
+npm run smoke    # 用 flybot 真实日志跑 API 冒烟测试（需先 npm run dev）
+```
 
 - Next.js 16 + TypeScript
 - SQLite + FTS5

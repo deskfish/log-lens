@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.5",

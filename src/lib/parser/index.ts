@@ -18,11 +18,22 @@ const LEVEL_MAP: Record<string, LogLevel> = {
 
 const SPRING =
   /^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\s+/i;
+const SPRING_BRACKET =
+  /^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s+\[[^\]]+\]\s+(ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\s+/i;
 const ISO = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)/;
 const NGINX = /\[(\d{2}\/[A-Za-z]{3}\/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\]/;
 
 function normalizeLevel(raw: string): LogLevel {
   return LEVEL_MAP[raw.toUpperCase()] ?? "UNKNOWN";
+}
+
+function parseSpringBracket(line: string): ParsedLine | null {
+  const match = line.match(SPRING_BRACKET);
+  if (!match) return null;
+  const ts = Date.parse(match[1].replace(" ", "T"));
+  const level = normalizeLevel(match[2]);
+  const message = line.slice(match[0].length).trim();
+  return { timestampMs: Number.isNaN(ts) ? null : ts, level, message };
 }
 
 function parseSpring(line: string): ParsedLine | null {
@@ -88,7 +99,7 @@ export function parseLogLine(line: string, lastTimestampMs: number | null): Pars
     return { timestampMs: lastTimestampMs, level: "UNKNOWN", message: "" };
   }
 
-  const parsers = [parseSpring, parseIso, parseJson, parseNginx];
+  const parsers = [parseSpringBracket, parseSpring, parseIso, parseJson, parseNginx];
   for (const parser of parsers) {
     const result = parser(trimmed);
     if (result) {
