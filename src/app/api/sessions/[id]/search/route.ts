@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
+import {
+  buildNextCursor,
+  buildSearchWhere,
+  mapLogRow,
+} from "@/lib/search/query";
 import type { LogLevel } from "@/lib/types";
 
 const DEFAULT_LIMIT = 200;
@@ -31,9 +36,9 @@ export async function GET(
 
   if (aroundId) {
     const center = db
-      .prepare(`SELECT * FROM log_entries WHERE id = ? AND session_id = ?`)
-      .get(aroundId, id) as Record<string, unknown> | undefined;
-    if (!center) return NextResponse.json({ entries: [], total: 0 });
+      .prepare(`SELECT id FROM log_entries WHERE id = ? AND session_id = ?`)
+      .get(aroundId, id);
+    if (!center) return NextResponse.json({ entries: [], total: 0, nextCursor: null });
 
     const entries = db
       .prepare(
@@ -41,58 +46,40 @@ export async function GET(
          WHERE session_id = ? AND id BETWEEN ? AND ?
          ORDER BY COALESCE(timestamp_ms, 9223372036854775807), id`,
       )
-      .all(id, aroundId - 50, aroundId + 50);
+      .all(id, aroundId - 50, aroundId + 50) as Array<Record<string, unknown>>;
 
-    return NextResponse.json({ entries, total: entries.length, mode: "context" });
-  }
-
-  const where: string[] = ["session_id = ?"];
-  const args: Array<string | number> = [id];
-
-  if (levels.length) {
-    where.push(`level IN (${levels.map(() => "?").join(",")})`);
-    args.push(...levels);
-  }
-  if (nodeKeys.length) {
-    const clauses = nodeKeys.map(() => "(service_name = ? AND node_name = ?)").join(" OR ");
-    where.push(`(${clauses})`);
-    for (const key of nodeKeys) {
-      const [service, node] = key.split("::");
-      args.push(service, node);
-    }
-  } else if (services.length) {
-    where.push(`service_name IN (${services.map(() => "?").join(",")})`);
-    args.push(...services);
-  }
-  if (timeFromMs !== undefined) {
-    where.push(`(timestamp_ms IS NULL OR timestamp_ms >= ?)`);
-    args.push(timeFromMs);
-  }
-  if (timeToMs !== undefined) {
-    where.push(`(timestamp_ms IS NULL OR timestamp_ms <= ?)`);
-    args.push(timeToMs);
-  }
-  if (cursor) {
-    where.push(`(COALESCE(timestamp_ms, 9223372036854775807) > ? OR (timestamp_ms = ? AND id > ?))`);
-    args.push(cursor.ts, cursor.ts, cursor.id);
+    return NextResponse.json({
+      entries: entries.map(mapLogRow),
+      total: entries.length,
+      nextCursor: null,
+      mode: "context",
+    });
   }
 
-  let entries: Array<Record<string, unknown>> = [];
+  const filterOpts = { levels, services, nodeKeys, timeFromMs, timeToMs, cursor };
+  const { sql: where, args } = buildSearchWhere(id, filterOpts);
+
+  let rows: Array<Record<string, unknown>> = [];
   let total = 0;
 
   if (query.trim()) {
     if (regex) {
       try {
         const re = new RegExp(query, "i");
-        const all = db
+        const batchSize = Math.max(limit * 4, 2000);
+        const batch = db
           .prepare(
             `SELECT * FROM log_entries WHERE ${where.join(" AND ")}
-             ORDER BY COALESCE(timestamp_ms, 9223372036854775807), id LIMIT 5000`,
+             ORDER BY COALESCE(timestamp_ms, 9223372036854775807), id
+             LIMIT ?`,
           )
-          .all(...args) as Array<Record<string, unknown>>;
-        const filtered = all.filter((row) => re.test(String(row.message)) || re.test(String(row.raw)));
+          .all(...args, batchSize) as Array<Record<string, unknown>>;
+
+        const filtered = batch.filter(
+          (row) => re.test(String(row.message)) || re.test(String(row.raw)),
+        );
+        rows = filtered.slice(0, limit);
         total = filtered.length;
-        entries = filtered.slice(0, limit);
       } catch {
         return NextResponse.json({ error: "Invalid regex" }, { status: 400 });
       }
@@ -103,18 +90,29 @@ export async function GET(
         .map((t) => `${t.replace(/["*]/g, "")}*`)
         .join(" ");
 
-      const ftsRows = db
+      const { sql: leWhere, args: leArgs } = buildSearchWhere(id, {
+        ...filterOpts,
+        tablePrefix: "le",
+      });
+
+      const countRow = db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM log_entries_fts
+           JOIN log_entries le ON le.id = log_entries_fts.rowid
+           WHERE log_entries_fts MATCH ? AND ${leWhere.join(" AND ")}`,
+        )
+        .get(ftsQuery, ...leArgs) as { c: number };
+      total = countRow.c;
+
+      rows = db
         .prepare(
           `SELECT le.* FROM log_entries_fts
            JOIN log_entries le ON le.id = log_entries_fts.rowid
-           WHERE log_entries_fts MATCH ? AND le.session_id = ?
+           WHERE log_entries_fts MATCH ? AND ${leWhere.join(" AND ")}
            ORDER BY COALESCE(le.timestamp_ms, 9223372036854775807), le.id
            LIMIT ?`,
         )
-        .all(ftsQuery, id, limit) as Array<Record<string, unknown>>;
-
-      entries = ftsRows;
-      total = ftsRows.length;
+        .all(ftsQuery, ...leArgs, limit) as Array<Record<string, unknown>>;
     }
   } else {
     total = (
@@ -123,7 +121,7 @@ export async function GET(
         .get(...args) as { c: number }
     ).c;
 
-    entries = db
+    rows = db
       .prepare(
         `SELECT * FROM log_entries WHERE ${where.join(" AND ")}
          ORDER BY COALESCE(timestamp_ms, 9223372036854775807), id
@@ -132,24 +130,8 @@ export async function GET(
       .all(...args, limit) as Array<Record<string, unknown>>;
   }
 
-  const mapped = entries.map((row) => ({
-    id: Number(row.id),
-    sessionId: String(row.session_id),
-    sourceFileId: String(row.source_file_id),
-    timestampMs: row.timestamp_ms === null ? null : Number(row.timestamp_ms),
-    level: String(row.level),
-    serviceName: String(row.service_name),
-    nodeName: String(row.node_name),
-    message: String(row.message),
-    raw: String(row.raw),
-    lineNumber: Number(row.line_number),
-  }));
-
-  const last = mapped[mapped.length - 1];
-  const nextCursor =
-    last && mapped.length === limit
-      ? `${last.timestampMs ?? 9223372036854775807}:${last.id}`
-      : null;
+  const mapped = rows.map(mapLogRow);
+  const nextCursor = buildNextCursor(mapped, limit);
 
   const tree = db
     .prepare(

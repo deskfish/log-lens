@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import { ServiceNodeTree } from "@/components/filters/ServiceNodeTree";
 import { VirtualLogTable } from "@/components/logs/VirtualLogTable";
 import { TimelineHeatRibbon } from "@/components/timeline/TimelineHeatRibbon";
+import { fetchSearch } from "@/lib/search/client";
 import type { IndexProgress, LogEntry, ServiceNodeTree as Tree, TimeBucket } from "@/lib/types";
 import styles from "./analysis.module.css";
 
@@ -20,6 +21,8 @@ export default function AnalysisPage() {
   const [tree, setTree] = useState<Tree[]>([]);
   const [buckets, setBuckets] = useState<TimeBucket[]>([]);
   const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [status, setStatus] = useState<IndexProgress | null>(null);
   const [query, setQuery] = useState("");
   const [regex, setRegex] = useState(false);
@@ -31,27 +34,7 @@ export default function AnalysisPage() {
   const [contextEntries, setContextEntries] = useState<LogEntry[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const loadSearch = useCallback(async () => {
-    const sp = new URLSearchParams();
-    if (query) sp.set("query", query);
-    if (regex) sp.set("regex", "true");
-    levels.forEach((l) => sp.append("level", l));
-    selectedServices.forEach((s) => sp.append("service", s));
-    selectedNodes.forEach((key) => sp.append("nodeKey", key));
-    if (timeFromMs !== undefined) sp.set("timeFromMs", String(timeFromMs));
-    if (timeToMs !== undefined) sp.set("timeToMs", String(timeToMs));
-
-    const res = await fetch(`/api/sessions/${sessionId}/search?${sp}`);
-    const data = (await res.json()) as {
-      entries: LogEntry[];
-      total: number;
-      tree: Tree[];
-    };
-    setEntries(data.entries);
-    setTotal(data.total);
-    setTree(data.tree);
-  }, [
-    sessionId,
+  const searchInputRef = useRef({
     query,
     regex,
     levels,
@@ -59,7 +42,57 @@ export default function AnalysisPage() {
     selectedNodes,
     timeFromMs,
     timeToMs,
-  ]);
+  });
+
+  useEffect(() => {
+    searchInputRef.current = {
+      query,
+      regex,
+      levels,
+      selectedServices,
+      selectedNodes,
+      timeFromMs,
+      timeToMs,
+    };
+  }, [query, regex, levels, selectedServices, selectedNodes, timeFromMs, timeToMs]);
+
+  const runSearch = useCallback(
+    async (cursor?: string | null, append = false) => {
+      const input = searchInputRef.current;
+      const data = await fetchSearch(sessionId, {
+        query: input.query,
+        regex: input.regex,
+        levels: input.levels as typeof LEVELS[number][],
+        services: input.selectedServices,
+        nodeKeys: input.selectedNodes,
+        timeFromMs: input.timeFromMs,
+        timeToMs: input.timeToMs,
+        cursor: cursor ?? undefined,
+      });
+
+      setEntries((prev) => (append ? [...prev, ...data.entries] : data.entries));
+      setTotal(data.total);
+      setNextCursor(data.nextCursor);
+      if (!append) setTree(data.tree);
+      return data;
+    },
+    [sessionId],
+  );
+
+  const loadSearch = useCallback(async () => {
+    setLoadingMore(false);
+    await runSearch(null, false);
+  }, [runSearch]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      await runSearch(nextCursor, true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, runSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,19 +104,14 @@ export default function AnalysisPage() {
 
       setStatus(statusData);
       if (statusData.status === "ready") {
-        const sp = new URLSearchParams();
-        const searchRes = await fetch(`/api/sessions/${sessionId}/search?${sp}`);
-        const searchData = (await searchRes.json()) as {
-          entries: LogEntry[];
-          total: number;
-          tree: Tree[];
-        };
+        const data = await fetchSearch(sessionId, {});
         const timelineRes = await fetch(`/api/sessions/${sessionId}/timeline`);
         const timelineData = (await timelineRes.json()) as { buckets: TimeBucket[] };
         if (cancelled) return;
-        setEntries(searchData.entries);
-        setTotal(searchData.total);
-        setTree(searchData.tree);
+        setEntries(data.entries);
+        setTotal(data.total);
+        setNextCursor(data.nextCursor);
+        setTree(data.tree);
         setBuckets(timelineData.buckets);
         return true;
       }
@@ -124,6 +152,8 @@ export default function AnalysisPage() {
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   }
+
+  const hasMore = Boolean(nextCursor) && entries.length < total;
 
   return (
     <AppShell
@@ -174,7 +204,9 @@ export default function AnalysisPage() {
             <button type="button" className={styles.searchBtn} onClick={() => void loadSearch()}>
               搜索
             </button>
-            <span className={styles.count}>{total.toLocaleString()} 条结果</span>
+            <span className={styles.count}>
+              已加载 {entries.length.toLocaleString()} / {total.toLocaleString()} 条
+            </span>
           </div>
 
           {status && status.status !== "ready" && (
@@ -190,6 +222,9 @@ export default function AnalysisPage() {
             selectedId={selectedId}
             highlight={query}
             onSelect={openContext}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={() => void loadMore()}
           />
         </section>
 
@@ -220,22 +255,24 @@ export default function AnalysisPage() {
         onSelectRange={async (from, to) => {
           setTimeFromMs(from);
           setTimeToMs(to);
-          const sp = new URLSearchParams();
-          if (query) sp.set("query", query);
-          if (regex) sp.set("regex", "true");
-          levels.forEach((l) => sp.append("level", l));
-          selectedServices.forEach((s) => sp.append("service", s));
-          selectedNodes.forEach((key) => sp.append("nodeKey", key));
-          sp.set("timeFromMs", String(from));
-          sp.set("timeToMs", String(to));
-          const res = await fetch(`/api/sessions/${sessionId}/search?${sp}`);
-          const data = (await res.json()) as {
-            entries: LogEntry[];
-            total: number;
-            tree: Tree[];
+          searchInputRef.current = {
+            ...searchInputRef.current,
+            timeFromMs: from,
+            timeToMs: to,
           };
+          setLoadingMore(false);
+          const data = await fetchSearch(sessionId, {
+            query: searchInputRef.current.query,
+            regex: searchInputRef.current.regex,
+            levels: searchInputRef.current.levels as typeof LEVELS[number][],
+            services: searchInputRef.current.selectedServices,
+            nodeKeys: searchInputRef.current.selectedNodes,
+            timeFromMs: from,
+            timeToMs: to,
+          });
           setEntries(data.entries);
           setTotal(data.total);
+          setNextCursor(data.nextCursor);
         }}
       />
     </AppShell>
